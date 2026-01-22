@@ -1,0 +1,21 @@
+# --- Node.js (Backend) ---
+**/node_modules/
+**/npm-debug.log*
+**/.env
+
+# --- Flutter (Frontend) ---
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/ios/Flutter/Generated.xcconfig
+**/android/local.properties
+
+# --- Operating System ---
+.DS_Store
+Thumbs.db
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.iml
