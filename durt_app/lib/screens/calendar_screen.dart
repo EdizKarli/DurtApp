@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart'; // Tarih formatı için gerekli
-
+import 'day_details_page.dart';
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
 
@@ -91,6 +91,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
           _selectedDay = selectedDay;
           _focusedDay = focusedDay;
         });
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DayDetailsPage(selectedDate: selectedDay),
+          ),
+        );
       },
       onPageChanged: (focusedDay) {
         _focusedDay = focusedDay;
@@ -213,6 +219,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
           _selectedDay = day;
           _focusedDay = day;
         });
+
+        // EKSİK OLAN KISIM BURASIYDI: Sayfaya Yönlendirme
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DayDetailsPage(selectedDate: day),
+          ),
+        );
       },
       child: Container(
         height: 140, 

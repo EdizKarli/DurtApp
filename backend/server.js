@@ -37,6 +37,21 @@ app.post('/api/reminders', async (req, res) => {
     }
 });
 
+app.get('/api/reminders', async (req, res) => {
+    const { date } = req.query; // Frontend'den ?date=2026-01-25 diye gelecek
+    try {
+        // Postgres'te tarih karşılaştırması yapıyoruz
+        const result = await db.query(
+            "SELECT * FROM reminders WHERE TO_CHAR(reminder_time::date, 'YYYY-MM-DD') = $1", 
+            [date]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('❌ Veri Çekme Hatası:', err);
+        res.status(500).json({ error: "Veritabanı hatası" });
+    }
+});
+
 // 5. THE ONLY LISTEN CALL
 app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
