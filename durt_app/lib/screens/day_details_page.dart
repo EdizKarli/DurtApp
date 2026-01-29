@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // Backend için gerekli
-import 'dart:convert'; // JSON çevirmek için gerekli
-import 'package:intl/intl.dart'; // Tarih formatı için
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'add_reminder_page.dart';
-import 'edit_reminder_page.dart'; // YENİ: Düzenleme sayfasını içeri aktarıyoruz
+import 'edit_reminder_page.dart';
 
 class DayDetailsPage extends StatefulWidget {
   final DateTime selectedDate;
@@ -15,35 +15,38 @@ class DayDetailsPage extends StatefulWidget {
 }
 
 class _DayDetailsPageState extends State<DayDetailsPage> {
-  List<dynamic> reminders = []; // Veritabanından gelecek liste
-  bool isLoading = true; // Yükleniyor mu?
+  List<dynamic> reminders = [];
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchReminders(); // Sayfa açılınca verileri çek
+    _fetchReminders();
   }
 
-  // Backend'den Veri Çeken Fonksiyon
+  // GEÇMİŞ GÜN KONTROLÜ
+  // Seçilen tarih, bugünün gece yarısından (00:00) önceyse "Geçmiş" sayılır.
+  bool get _isPastDay {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day); // Sadece tarihi al, saati at
+    return widget.selectedDate.isBefore(today);
+  }
+
   Future<void> _fetchReminders() async {
-    // Tarihi YYYY-MM-DD formatına çevir (Backend böyle bekliyor)
     String formattedDate = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
     final url = Uri.parse('http://localhost:3000/api/reminders?date=$formattedDate');
 
     try {
       final response = await http.get(url);
-
       if (response.statusCode == 200) {
         setState(() {
-          reminders = json.decode(response.body); // Gelen JSON'ı listeye at
+          reminders = json.decode(response.body);
           isLoading = false;
         });
       } else {
-        print("Hata: ${response.statusCode}");
         setState(() => isLoading = false);
       }
     } catch (e) {
-      print("Bağlantı Hatası: $e");
       setState(() => isLoading = false);
     }
   }
@@ -57,46 +60,55 @@ class _DayDetailsPageState extends State<DayDetailsPage> {
         foregroundColor: Colors.white,
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.red)) // Yüklenirken dönen halka
+          ? const Center(child: CircularProgressIndicator(color: Colors.red))
           : reminders.isEmpty
-              ? _buildEmptyState() // Liste boşsa bu gözüksün
-              : _buildReminderList(), // Doluysa liste gözüksün
+              ? _buildEmptyState()
+              : _buildReminderList(),
       
-      // GÜNCELLEME 1: Geniş "Daha fazla ekleyin" butonu
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _navigateToAddPage,
-        backgroundColor: Colors.red,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text("Daha fazla ekleyin", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
+      // KURAL 1: Geçmiş günse "Ekleme Butonu" GİZLENSİN
+      floatingActionButton: _isPastDay 
+          ? null // Buton yok
+          : FloatingActionButton.extended(
+              onPressed: _navigateToAddPage,
+              backgroundColor: Colors.red,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text("Daha fazla ekleyin", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
     );
   }
 
-  // Boş Durum Tasarımı
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.event_note, size: 64, color: Colors.grey),
+          const Icon(Icons.history, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
-          const Text("Bugün için planlanmış bir dürt yok.", style: TextStyle(color: Colors.grey)),
+          // Geçmişse farklı mesaj göster
+          Text(
+            _isPastDay 
+              ? "Bu tarihte kaydedilmiş bir dürt yok." 
+              : "Bugün için planlanmış bir dürt yok.",
+            style: const TextStyle(color: Colors.grey),
+          ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _navigateToAddPage,
-            icon: const Icon(Icons.add),
-            label: const Text("İlk Dürtünü Ekle"),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-          )
+          
+          // Geçmişse "İlk Dürtünü Ekle" butonu da GİZLENSİN
+          if (!_isPastDay)
+            ElevatedButton.icon(
+              onPressed: _navigateToAddPage,
+              icon: const Icon(Icons.add),
+              label: const Text("İlk Dürtünü Ekle"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            )
         ],
       ),
     );
   }
 
-  // Dolu Liste Tasarımı
   Widget _buildReminderList() {
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 80), // Butonun altında kalmasın diye boşluk
+      padding: const EdgeInsets.only(bottom: 80),
       itemCount: reminders.length,
       itemBuilder: (context, index) {
         final reminder = reminders[index];
@@ -111,11 +123,12 @@ class _DayDetailsPageState extends State<DayDetailsPage> {
             ),
             subtitle: Text("${reminder['type']} • ${reminder['frequency']}"),
             
-            // GÜNCELLEME 2: Ok yerine "Düzenle" Butonu
+            // KURAL 2: Geçmişse "İncele", Gelecekse "Düzenle"
             trailing: TextButton.icon(
               onPressed: () => _navigateToEditPage(reminder),
-              icon: const Icon(Icons.edit, size: 16, color: Colors.grey),
-              label: const Text("Düzenle", style: TextStyle(color: Colors.grey)),
+              // İkon ve Yazı duruma göre değişiyor
+              icon: Icon(_isPastDay ? Icons.visibility : Icons.edit, size: 16, color: Colors.grey),
+              label: Text(_isPastDay ? "İncele" : "Düzenle", style: const TextStyle(color: Colors.grey)),
             ),
           ),
         );
@@ -124,23 +137,25 @@ class _DayDetailsPageState extends State<DayDetailsPage> {
   }
 
   void _navigateToAddPage() async {
-    // Ekleme sayfasına git ve dönüşte veriyi yenile
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => AddReminderPage(initialDate: widget.selectedDate)),
     );
-    _fetchReminders(); // Geri dönünce listeyi güncelle!
+    _fetchReminders();
   }
 
-  // YENİ: Düzenleme sayfasına gitme fonksiyonu
   void _navigateToEditPage(Map<String, dynamic> reminder) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditReminderPage(reminder: reminder),
+        // KURAL 3: Edit sayfasına "Sadece Okunabilir" (isReadOnly) bilgisini gönderiyoruz
+        builder: (context) => EditReminderPage(
+          reminder: reminder, 
+          isReadOnly: _isPastDay, // Eğer geçmişse TRUE gider
+        ),
       ),
     );
-    _fetchReminders(); // Düzenleme veya silme sonrası listeyi yenile
+    _fetchReminders();
   }
 
   Icon _getIconForType(String type) {
