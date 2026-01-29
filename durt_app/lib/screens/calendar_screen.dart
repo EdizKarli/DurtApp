@@ -212,6 +212,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Color borderColor = isToday ? darkRed : (isSelected ? Colors.red : Colors.grey.shade300);
     Color headerColor = isToday ? darkRed : (isSelected ? Colors.red : Colors.grey.shade200);
     Color textColor = (isSelected || isToday) ? Colors.white : Colors.black;
+    
+    String dayName = DateFormat('EEEE', 'tr_TR').format(day);
 
     return GestureDetector(
       onTap: () {
@@ -250,10 +252,33 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: Container(
                 width: double.infinity,
                 color: Colors.white,
-                alignment: Alignment.center,
-                child: isToday || isSelected 
-                  ? Icon(Icons.touch_app, size: 16, color: headerColor) 
-                  : null, 
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start, // En üstten başla
+                  children: [
+                    const SizedBox(height: 6), // Başlıktan biraz uzaklaş
+                    
+                    // --- GÜN İSMİ BURAYA EKLENDİ ---
+                    Text(
+                      dayName, // "Pazartesi"
+                      style: TextStyle(
+                        color: isToday ? darkRed : Colors.grey.shade700, // Bugünse kırmızı, değilse gri
+                        fontSize: 13, 
+                        fontWeight: FontWeight.w500
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    // ------------------------------
+
+                    // Alt kısımda ikon veya içerik (Ortalanmış şekilde)
+                    Expanded(
+                      child: Center(
+                        child: isToday || isSelected 
+                          ? Icon(Icons.touch_app, size: 16, color: headerColor) 
+                          : null,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
