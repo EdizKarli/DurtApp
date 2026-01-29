@@ -40,7 +40,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
             const Text("Dürt Türü", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               hint: const Text("Bir tür seçiniz"),
               items: _types.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
               onChanged: (value) => setState(() => _selectedType = value),
@@ -94,7 +94,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
             const Text("Hatırlatma Sıklığı", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedFrequency,
+              initialValue: _selectedFrequency,
               items: _frequencies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
               onChanged: (value) {
                 setState(() {
@@ -130,14 +130,23 @@ class _AddReminderPageState extends State<AddReminderPage> {
   }
 
   Future<void> _pickDate() async {
+    // Eğer düzenleme yaparken mevcut tarih bugünden önceyse (geçmişteyse),
+    // Takvim açılırken hata vermemesi için "başlangıç tarihini" o gün yapıyoruz.
+    // Ancak seçilebilir en erken tarih (firstDate) her zaman "Bugün" oluyor.
+    DateTime initial = _selectedDate;
+    if (initial.isBefore(DateTime.now())) {
+      initial = DateTime.now();
+    }
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
+      initialDate: initial,     // Takvim açıldığında seçili duran gün
+      firstDate: DateTime.now(), // KURAL: Bugünden önceki günler GRİ olur, seçilemez!
       lastDate: DateTime(2030),
-      locale: const Locale('tr', 'TR'),
+      locale: const Locale('tr', 'TR'), // Takvimin Türkçe olması için
     );
-    if (picked != null && picked != _selectedDate) {
+    
+    if (picked != null) {
       setState(() {
         _selectedDate = picked;
       });
