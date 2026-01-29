@@ -23,13 +23,18 @@ app.get('/api/message', (req, res) => {
 });
 
 // 4. POST Endpoint (Save Reminder)
+// server.js içindeki POST Endpoint (GÜNCEL)
 app.post('/api/reminders', async (req, res) => {
-    const { title, reminder_time } = req.body;
+    // 1. Frontend'den gelen 'type' ve 'frequency' verilerini aldığımızdan emin oluyoruz
+    const { title, reminder_time, type, frequency } = req.body; 
+
     try {
         const result = await db.query(
-            'INSERT INTO reminders (title, reminder_time) VALUES ($1, $2) RETURNING *',
-            [title, reminder_time]
+            // 2. SQL sorgusuna bu yeni sütunları eklediğimizden emin oluyoruz
+            'INSERT INTO reminders (title, reminder_time, type, frequency) VALUES ($1, $2, $3, $4) RETURNING *',
+            [title, reminder_time, type, frequency]
         );
+        console.log('✅ Veritabanına Yazıldı:', result.rows[0]); 
         res.json(result.rows[0]);
     } catch (err) {
         console.error('❌ DB Insert Error:', err);
@@ -49,6 +54,34 @@ app.get('/api/reminders', async (req, res) => {
     } catch (err) {
         console.error('❌ Veri Çekme Hatası:', err);
         res.status(500).json({ error: "Veritabanı hatası" });
+    }
+});
+
+// 6. PUT Endpoint (Dürt Güncelleme)
+app.put('/api/reminders/:id', async (req, res) => {
+    const { id } = req.params;
+    const { title, type, reminder_time, frequency } = req.body;
+    try {
+        const result = await db.query(
+            'UPDATE reminders SET title = $1, type = $2, reminder_time = $3, frequency = $4 WHERE id = $5 RETURNING *',
+            [title, type, reminder_time, frequency, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('❌ Güncelleme Hatası:', err);
+        res.status(500).json({ error: "Güncelleme yapılamadı" });
+    }
+});
+
+// 7. DELETE Endpoint (Dürt Silme)
+app.delete('/api/reminders/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM reminders WHERE id = $1', [id]);
+        res.json({ message: "Silindi" });
+    } catch (err) {
+        console.error('❌ Silme Hatası:', err);
+        res.status(500).json({ error: "Silinemedi" });
     }
 });
 
