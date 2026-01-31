@@ -5,9 +5,8 @@ import 'dart:convert';
 
 class EditReminderPage extends StatefulWidget {
   final Map<String, dynamic> reminder;
-  final bool isReadOnly; // YENİ: Sadece inceleme modu mu?
+  final bool isReadOnly;
 
-  // isReadOnly varsayılan olarak false olsun ki normal çalışsın
   const EditReminderPage({
     super.key, 
     required this.reminder, 
@@ -23,19 +22,38 @@ class _EditReminderPageState extends State<EditReminderPage> {
   final TextEditingController _customTypeController = TextEditingController();
   
   String? _selectedType;
-  DateTime _selectedDate = DateTime.now();
-  String _selectedFrequency = "1 Gün Önce";
+  
+  // Tarih ve Saat Ayrı Tutuluyor
+  DateTime _selectedDate = DateTime.now(); 
+  TimeOfDay _selectedTime = TimeOfDay.now();
+
+  String? _selectedFrequency; // Nullable yaptık ki hata vermesin
+
+  // YENİ LİSTE (AddReminderPage ile Aynı)
+  final List<String> _frequencies = [
+    "1 Gün",
+    "2 Gün",
+    "3 Gün",
+    "Haftada Bir",
+    "Ayda Bir",
+    "Özel Hatırlatma"
+  ];
 
   final List<String> _types = ["Doktor Muayenesi", "İş Görüşmesi", "Sınav", "Özel Dürt"];
-  final List<String> _frequencies = ["1 Gün Önce", "2 Gün Önce", "1 Hafta Önce"];
 
   @override
   void initState() {
     super.initState();
+    
+    // 1. BAŞLIK
     _titleController.text = widget.reminder['title'];
-    _selectedFrequency = widget.reminder['frequency'] ?? "1 Gün Önce";
-    _selectedDate = DateTime.parse(widget.reminder['reminder_time']);
+    
+    // 2. TARİH VE SAAT AYRIŞTIRMA
+    DateTime fullDate = DateTime.parse(widget.reminder['reminder_time']).toLocal();
+    _selectedDate = fullDate;
+    _selectedTime = TimeOfDay.fromDateTime(fullDate);
 
+    // 3. TÜR (Type) KONTROLÜ
     String incomingType = widget.reminder['type'];
     if (_types.contains(incomingType)) {
       _selectedType = incomingType;
@@ -43,16 +61,29 @@ class _EditReminderPageState extends State<EditReminderPage> {
       _selectedType = "Özel Dürt";
       _customTypeController.text = incomingType;
     }
+
+    // 4. SIKLIK (Frequency) - ÇÖKME KORUMASI
+    String incomingFreq = widget.reminder['frequency'] ?? "1 Gün";
+    
+    if (_frequencies.contains(incomingFreq)) {
+      // Eğer veritabanındaki değer listemizde varsa onu seç
+      _selectedFrequency = incomingFreq;
+    } else {
+      // Eğer yoksa (örn: '1 Gün Önce'), uygulamanın çökmesini önlemek için
+      // bu değeri geçici olarak listeye ekle veya varsayılan bir değer ata.
+      // Burada kullanıcı ne görüyorsa onu korumak için listeye ekliyoruz.
+      _frequencies.add(incomingFreq); 
+      _selectedFrequency = incomingFreq;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Sadece okuma modundaysak kutular kilitli (enabled: false) olsun
     bool isEditingAllowed = !widget.isReadOnly; 
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isReadOnly ? "Dürt Detayı" : "Dürt Düzenle"), // Başlık değişiyor
+        title: Text(widget.isReadOnly ? "Dürt Detayı" : "Dürt Düzenle"), 
         backgroundColor: Colors.white, 
         foregroundColor: Colors.black, 
         elevation: 0
@@ -62,20 +93,20 @@ class _EditReminderPageState extends State<EditReminderPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // --- TÜR SEÇİMİ ---
             const Text("Dürt Türü", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
-            // Dropdown kilitlendi
             IgnorePointer(
-              ignoring: !isEditingAllowed, // Tıklamayı engelle
+              ignoring: !isEditingAllowed, 
               child: DropdownButtonFormField<String>(
                 value: _selectedType,
                 items: _types.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
-                onChanged: isEditingAllowed ? (value) { // Değişiklik kapalıysa null yapmıyoruz ama IgnorePointer zaten engelliyor
+                onChanged: isEditingAllowed ? (value) { 
                   setState(() {
                     _selectedType = value;
                     if (value != "Özel Dürt") _customTypeController.clear();
                   });
-                } : null, // Görsel olarak da pasif dursun
+                } : null, 
                 decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
               ),
             ),
@@ -84,22 +115,23 @@ class _EditReminderPageState extends State<EditReminderPage> {
               const SizedBox(height: 10),
               TextField(
                 controller: _customTypeController,
-                readOnly: !isEditingAllowed, // Klavye açılmaz
+                readOnly: !isEditingAllowed,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   filled: true, 
-                  fillColor: isEditingAllowed ? Colors.red.shade50 : Colors.grey.shade100, // Renk farkı
+                  fillColor: isEditingAllowed ? Colors.red.shade50 : Colors.grey.shade100, 
                 ),
               ),
             ],
             
             const SizedBox(height: 20),
             
+            // --- BAŞLIK ---
             const Text("Başlık", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             TextField(
               controller: _titleController, 
-              readOnly: !isEditingAllowed, // Klavye açılmaz
+              readOnly: !isEditingAllowed,
               decoration: InputDecoration(
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 fillColor: isEditingAllowed ? null : Colors.grey.shade100,
@@ -109,20 +141,21 @@ class _EditReminderPageState extends State<EditReminderPage> {
             
             const SizedBox(height: 20),
 
-            const Text("Son Tarih", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            // --- TARİH (YENİ KONSEPT) ---
+            const Text("Tarih", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             InkWell(
-              onTap: isEditingAllowed ? _pickDate : null, // Tıklanmaz
+              onTap: isEditingAllowed ? _pickDate : null, 
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(12),
-                  color: isEditingAllowed ? null : Colors.grey.shade100, // Arkaplan gri
+                  color: isEditingAllowed ? null : Colors.grey.shade100,
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today, color: isEditingAllowed ? Colors.blue : Colors.grey),
+                    Icon(Icons.event, color: isEditingAllowed ? Colors.red : Colors.grey),
                     const SizedBox(width: 10),
                     Text(
                       DateFormat('d MMMM yyyy', 'tr_TR').format(_selectedDate),
@@ -134,7 +167,36 @@ class _EditReminderPageState extends State<EditReminderPage> {
             ),
 
             const SizedBox(height: 20),
+
+            // --- SAAT (YENİ KONSEPT) ---
+            const Text("Saat", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: isEditingAllowed ? _pickTime : null, 
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(12),
+                  color: isEditingAllowed ? null : Colors.grey.shade100,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time, color: isEditingAllowed ? Colors.blue : Colors.grey),
+                    const SizedBox(width: 10),
+                    // Saati 24 saat formatında göster
+                    Text(
+                      "${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}",
+                      style: TextStyle(fontSize: 16, color: isEditingAllowed ? Colors.black : Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
             
+            // --- SIKLIK ---
             const Text("Sıklık", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
              IgnorePointer(
@@ -144,12 +206,12 @@ class _EditReminderPageState extends State<EditReminderPage> {
                 items: _frequencies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
                 onChanged: isEditingAllowed ? (value) => setState(() => _selectedFrequency = value!) : null,
                 decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                           ),
+               ),
              ),
 
             const SizedBox(height: 40),
 
-            // BUTONLAR SADECE DÜZENLEME MODUNDAYSA GÖZÜKÜR
+            // --- BUTONLAR ---
             if (isEditingAllowed) ...[
               SizedBox(
                 width: double.infinity,
@@ -184,7 +246,6 @@ class _EditReminderPageState extends State<EditReminderPage> {
                 ),
               ),
             ] else ...[
-              // İnceleme Modundaysa bilgilendirici bir yazı
               const Center(
                 child: Text(
                   "Geçmiş dürtler üzerinde değişiklik yapılamaz.",
@@ -198,8 +259,8 @@ class _EditReminderPageState extends State<EditReminderPage> {
     );
   }
 
+  // --- TARİH SEÇİMİ ---
   Future<void> _pickDate() async {
-    // ... (Eski kodunuzla aynı) ...
      DateTime initial = _selectedDate;
     if (initial.isBefore(DateTime.now())) {
       initial = DateTime.now();
@@ -214,16 +275,40 @@ class _EditReminderPageState extends State<EditReminderPage> {
     );
     
     if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  // --- SAAT SEÇİMİ ---
+  Future<void> _pickTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+    
+    if (picked != null) {
+      setState(() => _selectedTime = picked);
     }
   }
 
   Future<void> _updateReminder() async {
-      // ... (Eski kodunuzla aynı) ...
-     String finalType = _selectedType == "Özel Dürt" ? _customTypeController.text : _selectedType!;
+    String finalType = _selectedType == "Özel Dürt" ? _customTypeController.text : _selectedType!;
     final url = Uri.parse('http://localhost:3000/api/reminders/${widget.reminder['id']}');
+
+    // Tarih ve Saati birleştirip DateTime oluşturuyoruz
+    final DateTime finalDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    );
 
     try {
       final response = await http.put(
@@ -232,7 +317,7 @@ class _EditReminderPageState extends State<EditReminderPage> {
         body: jsonEncode({
           'title': _titleController.text,
           'type': finalType,
-          'reminder_time': _selectedDate.toIso8601String(), // Güncel tarihi gönderiyoruz
+          'reminder_time': finalDateTime.toIso8601String(),
           'frequency': _selectedFrequency,
         }),
       );
@@ -247,7 +332,6 @@ class _EditReminderPageState extends State<EditReminderPage> {
   }
 
   Future<void> _deleteReminder() async {
-      // ... (Eski kodunuzla aynı) ...
       bool? confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(

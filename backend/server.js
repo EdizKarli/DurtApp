@@ -42,14 +42,24 @@ app.post('/api/reminders', async (req, res) => {
     }
 });
 
+// 5. GET Endpoint (Güncellenmiş: Tarih varsa o günü, yoksa HEPSİNİ getir)
 app.get('/api/reminders', async (req, res) => {
-    const { date } = req.query; // Frontend'den ?date=2026-01-25 diye gelecek
+    const { date } = req.query; 
     try {
-        // Postgres'te tarih karşılaştırması yapıyoruz
-        const result = await db.query(
-            "SELECT * FROM reminders WHERE TO_CHAR(reminder_time::date, 'YYYY-MM-DD') = $1", 
-            [date]
-        );
+        let queryText;
+        let queryParams;
+
+        if (date) {
+            // Tarih varsa sadece o günü getir (Eski mantık korunuyor)
+            queryText = "SELECT * FROM reminders WHERE TO_CHAR(reminder_time::date, 'YYYY-MM-DD') = $1";
+            queryParams = [date];
+        } else {
+            // Tarih yoksa TÜM kayıtları getir (Takvim ekranı için)
+            queryText = "SELECT * FROM reminders";
+            queryParams = [];
+        }
+
+        const result = await db.query(queryText, queryParams);
         res.json(result.rows);
     } catch (err) {
         console.error('❌ Veri Çekme Hatası:', err);
