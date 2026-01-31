@@ -66,7 +66,7 @@ class _DayDetailsPageState extends State<DayDetailsPage> {
               : _buildReminderList(),
       
       // KURAL 1: Geçmiş günse "Ekleme Butonu" GİZLENSİN
-      floatingActionButton: _isPastDay 
+      floatingActionButton: (_isPastDay || reminders.isEmpty) 
           ? null // Buton yok
           : FloatingActionButton.extended(
               onPressed: _navigateToAddPage,
