@@ -23,22 +23,19 @@ app.get('/api/message', (req, res) => {
 });
 
 // 4. POST Endpoint (Save Reminder)
-// server.js içindeki POST Endpoint (GÜNCEL)
+// POST: Yeni Dürt Ekle (group_id eklendi)
 app.post('/api/reminders', async (req, res) => {
-    // 1. Frontend'den gelen 'type' ve 'frequency' verilerini aldığımızdan emin oluyoruz
-    const { title, reminder_time, type, frequency } = req.body; 
-
+    // group_id parametresini de alıyoruz
+    const { title, type, reminder_time, frequency, group_id } = req.body;
     try {
         const result = await db.query(
-            // 2. SQL sorgusuna bu yeni sütunları eklediğimizden emin oluyoruz
-            'INSERT INTO reminders (title, reminder_time, type, frequency) VALUES ($1, $2, $3, $4) RETURNING *',
-            [title, reminder_time, type, frequency]
+            "INSERT INTO reminders (title, type, reminder_time, frequency, group_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+            [title, type, reminder_time, frequency, group_id] // group_id $5 olarak eklendi
         );
-        console.log('✅ Veritabanına Yazıldı:', result.rows[0]); 
         res.json(result.rows[0]);
     } catch (err) {
-        console.error('❌ DB Insert Error:', err);
-        res.status(500).json({ error: "Database error" });
+        console.error(err);
+        res.status(500).json({ error: "Veri eklenemedi" });
     }
 });
 
@@ -92,6 +89,23 @@ app.delete('/api/reminders/:id', async (req, res) => {
     } catch (err) {
         console.error('❌ Silme Hatası:', err);
         res.status(500).json({ error: "Silinemedi" });
+    }
+});
+
+// ÖZEL DELETE: Belirli bir tarihten sonraki grup üyelerini sil
+app.delete('/api/reminders/group/:groupId/future', async (req, res) => {
+    const { groupId } = req.params;
+    const { date } = req.query; // Hangi tarihten sonrasını silelim?
+
+    try {
+        await db.query(
+            "DELETE FROM reminders WHERE group_id = $1 AND reminder_time > $2",
+            [groupId, date]
+        );
+        res.json({ message: "Gelecek kayıtlar temizlendi" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Silme hatası" });
     }
 });
 
