@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 class AddReminderPage extends StatefulWidget {
   final DateTime initialDate;
@@ -425,14 +426,15 @@ class _AddReminderPageState extends State<AddReminderPage> {
     );
 
     String finalType = _selectedType == "Özel Dürt" ? _customTypeController.text : _selectedType!;
-
+    String groupId = const Uuid().v4();
     // Döngü
     while ((loopDate.isBefore(_endDate) || loopDate.isAtSameMomentAs(_endDate)) && count < 365) {
       await _sendToBackend(
         title: _titleController.text,
         type: finalType,
         date: loopDate,
-        frequency: frequencyToSend 
+        frequency: frequencyToSend, 
+        groupId: groupId,
       );
       
       if (isEndDateToday) {
@@ -451,7 +453,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
     }
   }
 
-  Future<void> _sendToBackend({required String title, required String type, required DateTime date, required String frequency}) async {
+  Future<void> _sendToBackend({required String title, required String type, required DateTime date, required String frequency, required String groupId}) async {
     final url = Uri.parse('http://localhost:3000/api/reminders');
     
     // ÇÖZÜM BURADA:
@@ -470,6 +472,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
           'type': type,
           'reminder_time': formattedDate, // Saf metin olarak gönderiyoruz
           'frequency': frequency,
+          'group_id': groupId,
         }),
       );
     } catch (e) {
