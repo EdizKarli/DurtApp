@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http; 
 import 'dart:convert';
 import 'day_details_page.dart';
+import 'edit_reminder_page.dart'; // Edit sayfasını import etmeyi unutmayın
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -19,31 +20,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
   
   final Color darkRed = const Color.fromARGB(255, 200, 13, 0);
 
-  // GÜVENLİK 1: Başlangıçta boş bir Map ile başlatıyoruz ki null hatası almayalım.
   Map<String, List<dynamic>> _groupedReminders = {}; 
 
   @override
   void initState() {
     super.initState();
-    _selectedDay = _focusedDay; // Başlangıçta seçili günü ayarla
+    _selectedDay = _focusedDay; 
     _fetchAllReminders(); 
   }
 
-  // --- GÜVENLİ VERİ ÇEKME ---
   Future<void> _fetchAllReminders() async {
     final url = Uri.parse('http://localhost:3000/api/reminders'); 
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        // Gelen veriyi güvenli bir şekilde listeye çeviriyoruz
         List<dynamic> allData = json.decode(response.body) ?? []; 
         Map<String, List<dynamic>> tempMap = {};
 
         for (var item in allData) {
-          if (item['reminder_time'] == null) continue; // Tarih yoksa atla
+          if (item['reminder_time'] == null) continue;
 
           try {
-            // Tarihi güvenli parse et
             DateTime parsedDate = DateTime.parse(item['reminder_time']);
             String dateKey = DateFormat('yyyy-MM-dd').format(parsedDate);
             
@@ -69,6 +66,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String selectedDateKey = DateFormat('yyyy-MM-dd').format(_selectedDay ?? DateTime.now());
+
     return Scaffold(
       appBar: AppBar(title: const Text('TAKVİM')),
       body: Column(
@@ -79,14 +78,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
           const Divider(),
           
-          Expanded(
-            child: Center(
-              child: Text(
-                _selectedDay == null 
-                  ? "Dürtmenizi ayarlamak için tarih seçiniz." 
-                  : "${_selectedDay!.day}.${_selectedDay!.month}.${_selectedDay!.year} seçildi.",
-              ),
-            ),
+          DailyRemindersWidget(
+            reminders: _groupedReminders[selectedDateKey] ?? [],
+            // Bu fonksiyonu widget'a veriyoruz ki düzenleyip geri dönünce takvim yenilensin
+            onDataChanged: _fetchAllReminders, 
           ),
         ],
       ),
@@ -127,6 +122,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           _focusedDay = focusedDay;
         });
         
+        // Detay sayfasına giderken bekleme yapıyoruz
         await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => DayDetailsPage(selectedDate: selectedDay)),
@@ -225,13 +221,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // --- GÜVENLİ GÜN HÜCRESİ ---
+  // --- GÜN HÜCRESİ ---
   Widget _buildDayCell(DateTime day) {
     final isSelected = isSameDay(day, _selectedDay);
     final isToday = isSameDay(day, DateTime.now());
     
-    // GÜVENLİK 2: Veri çekerken null kontrolü
-    // Eğer Map null ise veya o tarihte veri yoksa boş liste ata
     String dateKey = DateFormat('yyyy-MM-dd').format(day);
     List<dynamic> dailyReminders = _groupedReminders[dateKey] ?? [];
 
@@ -293,18 +287,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                     const SizedBox(height: 4),
 
-                    // --- GÜVENLİ LİSTELEME ---
                     ...dailyReminders.take(3).map((reminder) {
-                      // GÜVENLİK 3: Her bir öğenin null olup olmadığını kontrol et
                       if (reminder == null || reminder is! Map) return const SizedBox();
 
-                      //List<String> standardTypes = ["Doktor Muayenesi", "İş Görüşmesi", "Sınav"];
                       String type = reminder['type'] ?? "";
-                      //String title = reminder['title'] ?? "";
-                      
                       String rawText = reminder['type'] ?? "";
 
-                      // 6 HARF SINIRI
                       String displayText = rawText.length > 6 
                           ? "${rawText.substring(0, 6)}..." 
                           : rawText;
@@ -338,12 +326,145 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   IconData _getIconData(String? type) {
-    if (type == null) return Icons.notifications; // Null gelirse varsayılan ikon
+    if (type == null) return Icons.notifications; 
     switch (type) {
       case 'Doktor Muayenesi': return Icons.local_hospital;
       case 'İş Görüşmesi': return Icons.work;
       case 'Sınav': return Icons.school;
+      case 'Doğum Günü': return Icons.cake;
+      case 'Evlilik Yıldönümü': return Icons.volunteer_activism;
+      case 'İlişki Yıldönümü': return Icons.favorite;
+      case 'Eğlence': return Icons.celebration;
       default: return Icons.notifications; 
     }
+  }
+}
+
+// ----------------------------------------------------
+// DAILY REMINDERS WIDGET (GÜNCELLENMİŞ HALİ)
+// ----------------------------------------------------
+class DailyRemindersWidget extends StatelessWidget {
+  final List<dynamic> reminders; 
+  final VoidCallback onDataChanged; // Veri yenileme fonksiyonu eklendi
+
+  const DailyRemindersWidget({
+    super.key, 
+    required this.reminders, 
+    required this.onDataChanged
+  });
+
+  static final Map<String, IconData> _typeIcons = {
+    "Doğum Günü": Icons.cake,
+    "Evlilik Yıldönümü": Icons.volunteer_activism,
+    "İlişki Yıldönümü": Icons.favorite,
+    "Eğlence": Icons.celebration,
+    "Doktor Muayenesi": Icons.medical_services,
+    "İş Görüşmesi": Icons.work,
+    "Sınav": Icons.school,
+    "Özel Dürt": Icons.edit_note,
+  };
+
+  Color _getIconColor(String type) {
+    switch (type) {
+      case "Doğum Günü": return Colors.pink;
+      case "Evlilik Yıldönümü": return Colors.red;
+      case "İlişki Yıldönümü": return Colors.redAccent;
+      case "Eğlence": return Colors.orange;
+      case "İş Görüşmesi": return Colors.blue;
+      case "Sınav": return Colors.purple;
+      case "Doktor Muayenesi": return Colors.teal;
+      default: return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (reminders.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Center(
+          child: Text(
+            "Bora, bugün için planlanmış bir Dürt yok. 😴",
+            style: TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+          child: Text(
+            "Bora, bugün için seni Dürtmek istedik:",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+
+        Container(
+          height: 320, 
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: ListView.builder(
+            itemCount: reminders.length,
+            itemBuilder: (context, index) {
+              final reminder = reminders[index];
+              final String type = reminder['type'] ?? "Özel Dürt";
+              final String title = reminder['title'] ?? "";
+              final String frequency = reminder['frequency'] ?? "";
+              
+              // GEÇMİŞ KONTROLÜ
+              // Dürt saati şu andan önceyse "Geçmiş" kabul edilir -> ReadOnly
+              DateTime reminderDate = DateTime.parse(reminder['reminder_time']);
+              bool isPast = reminderDate.isBefore(DateTime.now());
+
+              return Card(
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: _getIconColor(type).withOpacity(0.1),
+                    child: Icon(_typeIcons[type] ?? Icons.circle, color: _getIconColor(type)),
+                  ),
+                  title: Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text("$type • $frequency"),
+                  
+                  // --- DEĞİŞEN KISIM: İKON VE YÖNLENDİRME ---
+                  trailing: IconButton(
+                    icon: Icon(
+                      isPast ? Icons.visibility : Icons.edit, // Geçmişse GÖZ, Gelecekse KALEM
+                      color: Colors.grey
+                    ),
+                    tooltip: isPast ? "İncele" : "Düzenle",
+                    onPressed: () async {
+                      // Düzenleme sayfasına git
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditReminderPage(
+                            reminder: reminder,
+                            isReadOnly: isPast, // Geçmişse sadece okunur
+                          ),
+                        ),
+                      );
+                      // Geri dönünce verileri yenile
+                      onDataChanged();
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 }

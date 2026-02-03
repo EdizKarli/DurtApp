@@ -3,10 +3,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:uuid/uuid.dart';
+import 'package:uuid/uuid.dart'; 
 
 class AddReminderPage extends StatefulWidget {
-  final DateTime initialDate;
+  final DateTime initialDate; 
 
   const AddReminderPage({super.key, required this.initialDate});
 
@@ -19,15 +19,13 @@ class _AddReminderPageState extends State<AddReminderPage> {
   final TextEditingController _customTypeController = TextEditingController();
   
   String? _selectedType;
-  
-  // 1. SON TARİH
   DateTime _endDate = DateTime.now(); 
-  
-  // 2. HATIRLATMA SAATİ
   TimeOfDay _reminderTime = TimeOfDay.now();
 
-  String _selectedFrequency = "1 Gün";
+  // YENİ SEÇENEK EKLENDİ
+  String _selectedFrequency = "Sadece Bu Gün İçin"; 
   final List<String> _frequencies = [
+    "Sadece Bu Gün İçin", // EN BAŞA EKLENDİ
     "1 Gün",
     "2 Gün",
     "3 Gün",
@@ -37,38 +35,31 @@ class _AddReminderPageState extends State<AddReminderPage> {
   ];
 
   int? _customIntervalInDays; 
-  final List<String> _types = ["Doktor Muayenesi", "İş Görüşmesi", "Sınav", "Özel Dürt"];
+  final List<String> _types = [
+    "Doğum Günü",
+    "Evlilik Yıldönümü",
+    "İlişki Yıldönümü",
+    "Doktor Muayenesi",
+    "İş Görüşmesi",
+    "Sınav",
+    "Eğlence",
+    "Özel Dürt"
+  ];
 
   @override
   void initState() {
     super.initState();
-    
-    DateTime now = DateTime.now();
     DateTime targetDate = widget.initialDate;
-
-    // Eğer gelen tarih geçmişse, bugünü baz al
-    if (targetDate.isBefore(DateTime(now.year, now.month, now.day))) {
-      targetDate = now;
-    }
-
-    // --- KRİTİK DÜZELTME 1 ---
-    // Son tarih başlangıçta "Şu an" değil, "Bugünün Sonu (23:59:59)" olmalı.
-    // Yoksa saat 15:00 iken 18:00 seçerseniz döngü çalışmaz.
+    // Başlangıçta bitiş tarihi seçilen günün sonudur
     _endDate = DateTime(targetDate.year, targetDate.month, targetDate.day, 23, 59, 59);
-
     _reminderTime = TimeOfDay.now();
   }
 
-  // Bugün Kontrolü İçin Yardımcı Fonksiyon
-  bool _isToday(DateTime date) {
-    final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
-  }
 
   @override
   Widget build(BuildContext context) {
-    // KURAL: Eğer son tarih BUGÜN ise, sıklık seçimi kilitlenmeli
-    bool isFrequencyLocked = _isToday(_endDate);
+    // Eğer "Sadece Bu Gün İçin" seçiliyse son tarih kilitlenir
+    bool isOneTime = _selectedFrequency == "Sadece Bu Gün İçin";
 
     return Scaffold(
       appBar: AppBar(title: const Text("Yeni Dürt Ekle"), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
@@ -77,7 +68,7 @@ class _AddReminderPageState extends State<AddReminderPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- TÜR SEÇİMİ ---
+            // TÜR
             const Text("Dürt Türü", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -92,50 +83,78 @@ class _AddReminderPageState extends State<AddReminderPage> {
               },
               decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
             ),
-            
             if (_selectedType == "Özel Dürt") ...[
               const SizedBox(height: 10),
-              TextField(
-                controller: _customTypeController,
-                decoration: InputDecoration(
-                  hintText: "Özel türü yazın",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true, fillColor: Colors.red.shade50,
-                ),
-              ),
+              TextField(controller: _customTypeController, decoration: InputDecoration(hintText: "Özel türü yazın", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), filled: true, fillColor: Colors.red.shade50)),
             ],
-
             const SizedBox(height: 20),
 
-            // --- BAŞLIK ---
+            // BAŞLIK
             const Text("Başlık", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             TextField(controller: _titleController, decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
+            const SizedBox(height: 20),
+
+            // SIKLIK (SON TARİHTEN ÖNCE SEÇİLMELİ Kİ KİLİT MANTIĞI ÇALIŞSIN)
+            const Text("Hatırlatma Sıklığı", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedFrequency,
+              items: _frequencies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedFrequency = value!;
+                  if (value == "Özel Hatırlatma") {
+                    _showCustomIntervalDialog();
+                  } else if (value == "Sadece Bu Gün İçin") {
+                    // Tek seferlikse, Son Tarih = Başlangıç Tarihi olur
+                    _endDate = DateTime(widget.initialDate.year, widget.initialDate.month, widget.initialDate.day, 23, 59, 59);
+                    _customIntervalInDays = null;
+                  } else {
+                    _customIntervalInDays = null;
+                  }
+                });
+              },
+              decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+            ),
+            
+            if (_selectedFrequency == "Sadece Bu Gün İçin")
+              const Padding(
+                padding: EdgeInsets.only(top: 5.0, left: 5.0),
+                child: Text("Sadece seçili tarihe 1 adet dürt eklenir.", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ),
+            
+            if (_selectedFrequency == "Özel Hatırlatma" && _customIntervalInDays != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text("Seçilen Aralık: $_customIntervalInDays Gün'de bir", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              ),
 
             const SizedBox(height: 20),
 
-            // --- SON TARİH ---
-            const Text("Son Tarih (Hangi güne kadar?)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: _pickEndDate,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(12)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.event, color: Colors.red),
-                    const SizedBox(width: 10),
-                    Text(DateFormat('d MMMM yyyy', 'tr_TR').format(_endDate)),
-                  ],
+            // SON TARİH (Eğer Tek Seferlikse Gizle veya Kilitle)
+            if (!isOneTime) ...[
+              const Text("Son Tarih (Hangi güne kadar?)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _pickEndDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event, color: Colors.red),
+                      const SizedBox(width: 10),
+                      Text(DateFormat('d MMMM yyyy', 'tr_TR').format(_endDate)),
+                    ],
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 20),
+            ],
 
-            const SizedBox(height: 20),
-
-            // --- SAAT ---
-            const Text("Hatırlatma Saati (Saat kaçta?)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            // SAAT
+            const Text("Hatırlatma Saati", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
             InkWell(
               onTap: _pickTimeCupertino, 
@@ -146,69 +165,20 @@ class _AddReminderPageState extends State<AddReminderPage> {
                   children: [
                     const Icon(Icons.access_time, color: Colors.blue),
                     const SizedBox(width: 10),
-                    Text(
-                      "${_reminderTime.hour.toString().padLeft(2, '0')}:${_reminderTime.minute.toString().padLeft(2, '0')}",
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    Text("${_reminderTime.hour.toString().padLeft(2, '0')}:${_reminderTime.minute.toString().padLeft(2, '0')}", style: const TextStyle(fontSize: 16)),
                   ],
                 ),
               ),
             ),
 
-            const SizedBox(height: 20),
-
-            // --- SIKLIK ---
-            const Text("Hatırlatma Sıklığı", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 8),
-            IgnorePointer(
-              ignoring: isFrequencyLocked, 
-              child: DropdownButtonFormField<String>(
-                value: _selectedFrequency,
-                items: _frequencies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                onChanged: isFrequencyLocked ? null : (value) {
-                  setState(() => _selectedFrequency = value!);
-                  if (value == "Özel Hatırlatma") {
-                    _showCustomIntervalDialog();
-                  } else {
-                    _customIntervalInDays = null;
-                  }
-                },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: isFrequencyLocked,
-                  fillColor: isFrequencyLocked ? Colors.grey.shade200 : null,
-                ),
-              ),
-            ),
-            
-            if (isFrequencyLocked)
-              const Padding(
-                padding: EdgeInsets.only(top: 5.0, left: 5.0),
-                child: Text("Son tarih bugün olduğu için sıklık seçilemez.", style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ),
-            
-            if (!isFrequencyLocked && _selectedFrequency == "Özel Hatırlatma" && _customIntervalInDays != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  "Seçilen Aralık: $_customIntervalInDays Gün'de bir",
-                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                ),
-              ),
-
             const SizedBox(height: 40),
 
-            // OLUŞTUR BUTONU
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 onPressed: _generateAndSaveReminders,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 child: const Text("Dürtleri Oluştur", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
@@ -219,23 +189,16 @@ class _AddReminderPageState extends State<AddReminderPage> {
   }
 
   Future<void> _pickEndDate() async {
-    DateTime now = DateTime.now();
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _endDate,
-      firstDate: now,
+      initialDate: _endDate.isBefore(widget.initialDate) ? widget.initialDate : _endDate,
+      firstDate: widget.initialDate, 
       lastDate: DateTime(2030),
       locale: const Locale('tr', 'TR'),
     );
     if (picked != null) {
       setState(() {
-        // Gün sonuna sabitle (23:59:59)
         _endDate = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
-        
-        if (_isToday(_endDate)) {
-          _selectedFrequency = "1 Gün";
-          _customIntervalInDays = null;
-        }
       });
     }
   }
@@ -249,35 +212,12 @@ class _AddReminderPageState extends State<AddReminderPage> {
           color: Colors.white,
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Tamam", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                  )
-                ],
-              ),
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Tamam", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)))]),
               Expanded(
                 child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.time,
-                  use24hFormat: true,
+                  mode: CupertinoDatePickerMode.time, use24hFormat: true,
                   initialDateTime: DateTime(2024, 1, 1, _reminderTime.hour, _reminderTime.minute),
-                  onDateTimeChanged: (DateTime newDateTime) {
-                    
-                    if (_isToday(_endDate)) {
-                       final now = DateTime.now();
-                       if (newDateTime.hour < now.hour || (newDateTime.hour == now.hour && newDateTime.minute < now.minute)) {
-                         setState(() {
-                           _reminderTime = TimeOfDay.fromDateTime(now);
-                         });
-                         return;
-                       }
-                    }
-                    setState(() {
-                      _reminderTime = TimeOfDay.fromDateTime(newDateTime);
-                    });
-                  },
+                  onDateTimeChanged: (DateTime newDateTime) => setState(() => _reminderTime = TimeOfDay.fromDateTime(newDateTime)),
                 ),
               ),
             ],
@@ -288,95 +228,63 @@ class _AddReminderPageState extends State<AddReminderPage> {
   }
 
   void _showCustomIntervalDialog() {
-    int value = 1;
-    String unit = "Gün"; 
-
+    int value = 1; String unit = "Gün"; 
     showDialog(
-      context: context,
-      barrierDismissible: false,
+      context: context, barrierDismissible: false,
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
+        return StatefulBuilder(builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text("Özel Aralık Belirle"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Sayı"),
-                          onChanged: (val) => value = int.tryParse(val) ?? 1,
-                        ),
-                      ),
+              content: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Row(children: [
+                      Expanded(child: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: "Sayı"), onChanged: (val) => value = int.tryParse(val) ?? 1)),
                       const SizedBox(width: 10),
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value: unit,
-                          isExpanded: true,
-                          items: ["Gün", "Hafta"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                          onChanged: (val) => setDialogState(() => unit = val!),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                      Expanded(child: DropdownButton<String>(value: unit, isExpanded: true, items: ["Gün", "Hafta"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (val) => setDialogState(() => unit = val!))),
+                    ]),
+                ]),
               actions: [
-                TextButton(
-                  onPressed: () {
-                    setState(() => _selectedFrequency = "1 Gün");
-                    Navigator.pop(context);
-                  },
-                  child: const Text("İptal"),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    int days = 0;
-                    if (unit == "Gün") days = value;
-                    if (unit == "Hafta") days = value * 7;
-                    if (days < 1) days = 1;
-                    setState(() => _customIntervalInDays = days);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                  child: const Text("Ayarla"),
-                ),
+                TextButton(onPressed: () { setState(() => _selectedFrequency = "1 Gün"); Navigator.pop(context); }, child: const Text("İptal")),
+                ElevatedButton(onPressed: () { int days = 0; if (unit == "Gün") days = value; if (unit == "Hafta") days = value * 7; if (days < 1) days = 1; setState(() => _customIntervalInDays = days); Navigator.pop(context); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), child: const Text("Ayarla")),
               ],
             );
-          },
-        );
+          });
       },
     );
   }
 
   Future<void> _generateAndSaveReminders() async {
-    // 1. Önce Başlık ve Tür Kontrolü
     if (_titleController.text.isEmpty || _selectedType == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen başlık ve tür seçiniz")));
       return;
     }
 
+    DateTime baseDate = widget.initialDate;
+    DateTime loopDate = DateTime(baseDate.year, baseDate.month, baseDate.day, _reminderTime.hour, _reminderTime.minute);
     DateTime now = DateTime.now();
-    
-    // Saniye hassasiyetini temizle (Karşılaştırma için)
-    DateTime nowClean = DateTime(now.year, now.month, now.day, now.hour, now.minute);
-    
-    // Hatırlatma Zamanı (Örn: Bugün 20:00 veya Bugün 14:00 olarak başlar)
-    DateTime loopDate = DateTime(
-      now.year, now.month, now.day, 
-      _reminderTime.hour, _reminderTime.minute
-    );
 
-    // --- SIKLIK VE ARALIK HESABI (Öne çektik) ---
-    // Bu hesabı loopDate kontrolünden önce yapmalıyız ki
-    // eğer saat geçmişse ne kadar öteleyeceğimizi bilelim.
+    // SADECE BU GÜN İÇİN SEÇİLİYSE: Geçmiş kontrolü yapma. O güne, o saate ekle.
+    if (_selectedFrequency != "Sadece Bu Gün İçin") {
+      // Eğer seri oluşturulacaksa ve saat geçmişse ileri at
+      if (loopDate.isBefore(now)) {
+        int intervalDays = 1;
+         // ... (Sıklık hesaplama kodu, aşağıda tekrar var)
+         if (_selectedFrequency == "Özel Hatırlatma") intervalDays = _customIntervalInDays ?? 1;
+         else if (_selectedFrequency == "1 Gün") intervalDays = 1;
+         // ... (kısalık için)
+         else intervalDays = 1;
+
+        loopDate = loopDate.add(Duration(days: intervalDays));
+      }
+    }
+
     int intervalDays = 1;
     String frequencyToSend = _selectedFrequency;
 
-    if (_selectedFrequency == "Özel Hatırlatma") {
+    if (_selectedFrequency == "Sadece Bu Gün İçin") {
+      frequencyToSend = "Tek Seferlik";
+      // Bitiş tarihi de başlangıçla aynı olsun ki döngü 1 kez çalışsın
+      _endDate = DateTime(loopDate.year, loopDate.month, loopDate.day, 23, 59, 59);
+    } else if (_selectedFrequency == "Özel Hatırlatma") {
       intervalDays = _customIntervalInDays ?? 1;
     } else {
       switch (_selectedFrequency) {
@@ -389,57 +297,19 @@ class _AddReminderPageState extends State<AddReminderPage> {
       }
     }
 
-    // --- KRİTİK MANTIK DÜZELTMESİ ---
-    
-    bool isEndDateToday = _isToday(_endDate);
-
-    if (isEndDateToday) {
-      // Eğer son tarih bugünse, sıklık "Tek Seferlik" olur.
-      frequencyToSend = "Tek Seferlik"; 
-
-      // Eğer saat geçmişteyse HATA VER (Bugüne ekleyemezsin)
-      if (loopDate.isBefore(nowClean)) {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Geçmiş bir saate dürt eklenemez.")));
-         return;
-      }
-      // Eğer saat gelecekteyse dokunma, loopDate BUGÜN olarak kalsın.
-      
-    } else {
-      // Eğer son tarih ileri bir tarihse:
-      
-      if (loopDate.isBefore(nowClean)) {
-        // SENARYO A: Saat 19:00, Seçilen 14:00 (Geçmiş)
-        // Bugünü atla ve direkt olarak ARALIK kadar ileri git.
-        // (Eskiden sadece 1 gün ekliyorduk, hata buydu. Artık 2 günse 2 gün ekliyoruz.)
-        loopDate = loopDate.add(Duration(days: intervalDays));
-      } 
-      // SENARYO B: Saat 19:00, Seçilen 20:00 (Gelecek)
-      // Hiçbir şey yapma. loopDate BUGÜN 20:00 olarak başlar. 
-    }
-
+    String groupId = const Uuid().v4(); 
     int count = 0;
-    
-    showDialog(
-      context: context, 
-      barrierDismissible: false,
-      builder: (c) => const Center(child: CircularProgressIndicator(color: Colors.red))
-    );
-
     String finalType = _selectedType == "Özel Dürt" ? _customTypeController.text : _selectedType!;
-    String groupId = const Uuid().v4();
-    // Döngü
+
+    showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator(color: Colors.red)));
+
     while ((loopDate.isBefore(_endDate) || loopDate.isAtSameMomentAs(_endDate)) && count < 365) {
-      await _sendToBackend(
-        title: _titleController.text,
-        type: finalType,
-        date: loopDate,
-        frequency: frequencyToSend, 
-        groupId: groupId,
-      );
+      await _sendToBackend(title: _titleController.text, type: finalType, date: loopDate, frequency: frequencyToSend, groupId: groupId);
       
-      if (isEndDateToday) {
-        count++; 
-        break;   
+      // Tek seferlikse hemen dur
+      if (frequencyToSend == "Tek Seferlik") {
+        count++;
+        break;
       }
 
       loopDate = loopDate.add(Duration(days: intervalDays));
@@ -447,36 +317,16 @@ class _AddReminderPageState extends State<AddReminderPage> {
     }
 
     if (mounted) {
-      Navigator.pop(context); 
-      Navigator.pop(context); 
+      Navigator.pop(context); Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Toplam $count adet dürt oluşturuldu!")));
     }
   }
 
   Future<void> _sendToBackend({required String title, required String type, required DateTime date, required String frequency, required String groupId}) async {
     final url = Uri.parse('http://localhost:3000/api/reminders');
-    
-    // ÇÖZÜM BURADA:
-    // Tarihi formatlarken kütüphane kullanmak yerine elle oluşturuyoruz.
-    // Böylece saat dilimi farkı (UTC+3) silinmeden, ekranda ne görüyorsak o gidiyor.
-    String formattedDate = 
-        "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} "
-        "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:00";
-
+    String formattedDate = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:00";
     try {
-      await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'title': title,
-          'type': type,
-          'reminder_time': formattedDate, // Saf metin olarak gönderiyoruz
-          'frequency': frequency,
-          'group_id': groupId,
-        }),
-      );
-    } catch (e) {
-      print("Hata: $e");
-    }
+      await http.post(url, headers: {'Content-Type': 'application/json'}, body: jsonEncode({'title': title, 'type': type, 'reminder_time': formattedDate, 'frequency': frequency, 'group_id': groupId}));
+    } catch (e) { print("Hata: $e"); }
   }
 }

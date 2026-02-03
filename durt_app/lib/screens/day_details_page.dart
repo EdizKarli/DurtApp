@@ -163,6 +163,10 @@ class _DayDetailsPageState extends State<DayDetailsPage> {
       case 'Doktor Muayenesi': return const Icon(Icons.local_hospital, color: Colors.red);
       case 'İş Görüşmesi': return const Icon(Icons.work, color: Colors.blue);
       case 'Sınav': return const Icon(Icons.school, color: Colors.orange);
+      case 'Doğum Günü': return const Icon(Icons.cake, color: Colors.yellow);
+      case 'Evlilik Yıldönümü': return const Icon(Icons.volunteer_activism, color: Colors.pink);
+      case 'İlişki Yıldönümü': return const Icon(Icons.favorite, color: Colors.red);
+      case 'Eğlence': return const Icon(Icons.celebration, color: Colors.green);
       default: return const Icon(Icons.notifications, color: Colors.grey);
     }
   }
